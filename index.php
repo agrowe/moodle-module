@@ -26,7 +26,17 @@ if (!$course = $DB->get_record("course", array("id" => $id))) {
 }
 
 $PAGE->set_pagelayout('incourse');
-add_to_log($course->id, "equella", "view all", "index.php?id=$course->id", "");
+
+if (class_exists('mod_equella\\event\\course_module_instance_list_viewed')) {
+    $params = array(
+        'context' => context_course::instance($course->id)
+    );
+    $event = \mod_equella\event\course_module_instance_list_viewed::create($params);
+    $event->add_record_snapshot('course', $course);
+   $event->trigger();
+} else {
+    add_to_log($course->id, "equella", "view all", "index.php?id=$course->id", "");
+}
 
 $strnoinst = get_string("noinstances", "equella");
 $strequellas = get_string("modulenameplural", "equella");
