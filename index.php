@@ -21,10 +21,10 @@ require_login();
 
 $id = required_param('id', PARAM_INT); // course
 
-if (!$course = $DB->get_record("course", array("id" => $id))) {
-    print_error('invalidcourseid', '', '', $id);
-}
+$course = $DB->get_record('course', array('id' => $id), '*', MUST_EXIST);
 
+$context = context_course::instance($id);
+$PAGE->set_context($context);
 $PAGE->set_pagelayout('incourse');
 
 if (class_exists('mod_equella\\event\\course_module_instance_list_viewed')) {
@@ -33,7 +33,7 @@ if (class_exists('mod_equella\\event\\course_module_instance_list_viewed')) {
     );
     $event = \mod_equella\event\course_module_instance_list_viewed::create($params);
     $event->add_record_snapshot('course', $course);
-   $event->trigger();
+    $event->trigger();
 } else {
     add_to_log($course->id, "equella", "view all", "index.php?id=$course->id", "");
 }
@@ -52,8 +52,8 @@ $PAGE->navbar->add($strequellas);
 echo $OUTPUT->header();
 
 if (!$equellas = get_all_instances_in_course("equella", $course)) {
-    notice($strnoinst, "../../course/view.php?id=$course->id");
-    die();
+    $url = new moodle_url('/course/view.php', array('id'=>$course->id));
+    notice($strnoinst, $url);
 }
 
 $timenow = time();
@@ -69,7 +69,12 @@ if ($course->format == "weeks") {
     $table->align = array("left");
 }
 
-$currentgroup = get_current_group($course->id);
+if (function_exists('groups_get_all_groups')) {
+    $currentgroup = groups_get_all_groups($course->id);
+} else {
+    $currentgroup = get_current_group($course->id);
+}
+
 if ($currentgroup and isteacheredit($course->id)) {
     $group = $DB->get_record("groups", array("id" => $currentgroup));
     $groupname = " ($group->name)";
@@ -80,13 +85,12 @@ if ($currentgroup and isteacheredit($course->id)) {
 $currentsection = "";
 
 foreach($equellas as $equella) {
+    $url = new moodle_url('/mod/equella/view.php', array('id'=>$equella->coursemodule));
+    $attr = array();
     if (!$equella->visible) {
-        // Show dimmed if the mod is hidden
-        $link = "<a class=\"dimmed\" href=\"view.php?id=$equella->coursemodule\">$equella->name</a>";
-    } else {
-        // Show normal if the mod is visible
-        $link = "<a href=\"view.php?id=$equella->coursemodule\">$equella->name</a>";
+        $attr = array('class'=>'dimmed');
     }
+    $link = html_writer::link($url, $equella->name, $attr);
 
     $printsection = "";
     if ($equella->section !== $currentsection) {
@@ -106,7 +110,7 @@ foreach($equellas as $equella) {
     }
 }
 
-echo "<br />";
+echo html_writer::empty_tag('br');
 
 echo html_writer::table($table);
 echo $OUTPUT->footer();
